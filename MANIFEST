@@ -14,4 +14,6 @@ lib/AI/NNEasy/NN/layer.hploo
 lib/AI/NNEasy/NN/layer.pm
 lib/AI/NNEasy/NN/node.hploo
 lib/AI/NNEasy/NN/node.pm
+samples/test-nn-nonbool.pl
+samples/test-nn-xor.pl
 test.pl

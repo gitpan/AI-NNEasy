@@ -2,7 +2,7 @@
 ## This file was generated automatically by Class::HPLOO/0.20
 ##
 ## Original file:    ./lib/AI/NNEasy.hploo
-## Generation date:  2005-01-15 20:40:03
+## Generation date:  2005-01-15 21:52:35
 ##
 ## ** Do not change this file, use the original HPLOO source! **
 #############################################################################
@@ -29,7 +29,7 @@ use strict qw(vars) ; no warnings ;
 use vars qw(%CLASS_HPLOO @ISA $VERSION) ;
 
   
-$VERSION = '0.04' ;
+$VERSION = '0.05' ;
 
   
 @ISA = qw(Class::HPLOO::Base UNIVERSAL) ;
@@ -72,18 +72,21 @@ use Class::HPLOO::Base ;
       $layers_i = $in_sz+$out_sz if $layers_i <= 0 ;
     }
     
-    $in  = {nodes=>$in  , persistent_activation=>0 , decay=>0.0 , random_activation=>0 , threshold=>0.0 , activation_function=>'tanh' , random_weights=>1} if !ref($in) ;
-    $out = {nodes=>$out , persistent_activation=>0 , decay=>0.0 , random_activation=>0 , threshold=>0.0 , activation_function=>'tanh' , random_weights=>1} if !ref($out) ;
+    $conf ||= {} ;
+    
+    my $decay = $$conf{decay} || 0 ; 
+    
+    my $nn_in  = $this->_layer_conf( { decay=>$decay } , $in ) ;
+    my $nn_out  = $this->_layer_conf( { decay=>$decay , activation_function=>'linear' } , $out ) ;
     
     foreach my $layers_i ( @layers ) {
-      $layers_i = {nodes=>$layers_i, persistent_activation=>0 , decay=>0.0 , random_activation=>0 , threshold=>0.0 , activation_function=>'tanh' , random_weights=>1} if !ref($layers_i) ;
+      $layers_i = $this->_layer_conf( { decay=>$decay } , $layers_i ) ;
     }
     
     my $nn_conf = {random_connections=>0 , networktype=>'feedforward' , random_weights=>1 , learning_algorithm=>'backprop' , learning_rate=>0.1 , bias=>1} ;
+    foreach my $Key ( keys %$nn_conf ) { $$nn_conf{$Key} = $$conf{$Key} if exists $$conf{$Key} ;}
     
-    foreach my $Key ( keys %$conf ) { $$nn_conf{$Key} = $$conf{$Key} ;}
-    
-    $this->{NN_ARGS} = [[ $in , @layers , $out ] , $nn_conf] ;
+    $this->{NN_ARGS} = [[ $nn_in , @layers , $nn_out ] , $nn_conf] ;
 
     $this->{NN} = AI::NNEasy::NN->new( @{$this->{NN_ARGS}} ) ;
     
@@ -112,6 +115,23 @@ use Class::HPLOO::Base ;
     $this->{ERROR_OK} = $error_ok ;
     
     return $this ;
+  }
+  
+  sub _layer_conf { 
+    my $this = ref($_[0]) ? shift : undef ;
+    my $CLASS = ref($this) || __PACKAGE__ ;
+    my $def = shift(@_) ;
+    my $conf = shift(@_) ;
+    
+    $def ||= {} ;
+    $conf = { nodes=>$conf } if !ref($conf) ;
+    
+    foreach my $Key ( keys %$def ) { $$conf{$Key} = $$def{$Key} if !exists $$conf{$Key} ;}
+  
+    my $layer_conf  = {nodes=>1  , persistent_activation=>0 , decay=>0 , random_activation=>0 , threshold=>0 , activation_function=>'tanh' , random_weights=>1} ;
+    foreach my $Key ( keys %$layer_conf ) { $$layer_conf{$Key} = $$conf{$Key} if exists $$conf{$Key} ;}
+
+    return $layer_conf ;
   }
   
   sub reset_nn { 
@@ -223,7 +243,7 @@ use Class::HPLOO::Base ;
     $ins_ok ||= $ins_sz ;
     $limit ||= 30000 ;
     
-    my $err_static_limit = 30 ;
+    my $err_static_limit = 15 ;
   
     my $error_ok = $this->{ERROR_OK} ;
     
@@ -405,7 +425,7 @@ void _learn_set_get_output_error_c( SV* self , SV* set , double error_ok , int i
     dXSARGS;
     
     STRLEN len;
-    int i , j , k ;
+    int i ;
     HV* self_hv = OBJ_HV( self );
     AV* set_av = OBJ_AV( set ) ;
     SV* nn = FETCH_ATTR(self_hv , "NN") ;
@@ -721,6 +741,7 @@ I have made a C version only for the functions that are wild called, like:
   
   AI::NNEasy::NN::backprop::hiddenToOutput
   AI::NNEasy::NN::backprop::hiddenOrInputToHidden
+  AI::NNEasy::NN::backprop::RMSErr
 
 What give use the speed that we need to learn fast the inputs, but at the same time
 be able to create flexible NN.

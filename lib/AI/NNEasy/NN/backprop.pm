@@ -2,7 +2,7 @@
 ## This file was generated automatically by Class::HPLOO/0.20
 ##
 ## Original file:    ./lib/AI/NNEasy/NN/backprop.hploo
-## Generation date:  2005-01-15 20:22:46
+## Generation date:  2005-01-15 21:49:05
 ##
 ## ** Do not change this file, use the original HPLOO source! **
 #############################################################################
@@ -122,21 +122,19 @@ use Class::HPLOO::Base ;
 
   
   
-  sub RMSErr { 
+  *RMSErr = \&RMSErr_c ;
+  
+  sub RMSErr_pl { 
     my $this = ref($_[0]) ? shift : undef ;
     my $CLASS = ref($this) || __PACKAGE__ ;
     my $outputPatternRef = shift(@_) ;
     
-    my @outputPattern = @$outputPatternRef ;
-
     my $outputLayer = $this->{layers}->[-1]->{nodes} ;
-
-    return 0 if @$outputLayer != @outputPattern ;
 
     my $sqrErr ;
     my $counter = 0 ;
     foreach my $node (@$outputLayer) {
-      $sqrErr += ($node->{activation} - $outputPattern[$counter])**2 ;
+      $sqrErr += ($node->{activation} - $$outputPatternRef[$counter])**2 ;
       ++$counter ;
     }
 
@@ -144,6 +142,8 @@ use Class::HPLOO::Base ;
 
     return $error;
   }
+  
+  
 
 use Inline C => <<'__INLINE_C_SRC__';
 
@@ -239,6 +239,34 @@ void hiddenOrInputToHidden_c( SV* self ) {
         }
       }
     }
+}
+
+double RMSErr_c( SV* self , SV* outputPatternRef ) {
+    STRLEN len;
+    int i ;
+    HV* self_hv = OBJ_HV( self );
+    
+    AV* outputLayer = FETCH_ATTR_AV_REF( FETCH_ELEM_HV_REF( FETCH_ATTR_AV_REF(self_hv , "layers") , -1) , "nodes") ;
+    int outputLayer_len = av_len(outputLayer) ;
+    
+    AV* outputPattern = OBJ_AV(outputPatternRef) ;
+        
+    double sqrErr = 0 ;
+    double error = 0 ;
+    
+    for (i = 0 ; i <= av_len(outputLayer) ; ++i) {
+      HV* node = OBJ_HV( *av_fetch(outputLayer, i ,0) ) ;
+      double val ;
+
+      val = i <= outputLayer_len ? SvNV(*av_fetch(outputPattern, i ,0)) : 0 ;
+      val = FETCH_ATTR_NV(node , "activation") - val ;
+
+      sqrErr = val * val ;
+    }    
+    
+    error = Perl_sqrt(sqrErr) ;
+
+    return error ;
 }
 
 __INLINE_C_SRC__

@@ -2,7 +2,7 @@
 ## This file was generated automatically by Class::HPLOO/0.20
 ##
 ## Original file:    ./lib/AI/NNEasy/NN/feedforward.hploo
-## Generation date:  2005-01-15 20:22:46
+## Generation date:  2005-01-15 21:42:33
 ##
 ## ** Do not change this file, use the original HPLOO source! **
 #############################################################################
@@ -116,8 +116,6 @@ void run_c( SV* self , SV* inputPatternRef) {
     AV* layers ;
     HV* self_hv = OBJ_HV( self );
     char* function ;
-    
-    int counter = 0 ;
         
     AV* nodes = FETCH_ATTR_AV_REF( FETCH_ELEM_HV_REF( FETCH_ATTR_AV_REF(self_hv , "layers") , 0) , "nodes") ;
     for (i = 0 ; i <= av_len(nodes) ; ++i) {
@@ -125,7 +123,7 @@ void run_c( SV* self , SV* inputPatternRef) {
       
       if ( SvTRUE( FETCH_ATTR(node , "active") ) ) {
         SV* activation = FETCH_ATTR(node , "activation") ;
-        SV* input = *av_fetch(inputPattern, counter ,0) ;
+        SV* input = *av_fetch(inputPattern, i ,0) ;
         
         if ( SvTRUE( FETCH_ATTR(node , "persistent_activation") ) ) {
           sv_setnv(activation , (SvNV(activation) + SvNV(input)) ) ;
@@ -134,8 +132,6 @@ void run_c( SV* self , SV* inputPatternRef) {
           sv_setnv(activation , SvNV(input)) ;
         }
       }
-      
-      ++counter ;
     }
     
     layers = FETCH_ATTR_AV_REF(self_hv , "layers") ;

@@ -1,5 +1,12 @@
 Revision history for Perl extension AI::NNEasy.
 
+0.05  2005-01-15
+      - Fixed default values for layers, specially the activation
+        funtion for the output layer that is better as linear.
+      - Added samples.
+      - Changed some internal values for learn_set() to learn faster.
+      - More XS support: AI::NNEasy::NN::backprop::RMSErr_c
+
 0.04  2005-01-15
       - POD fixes.
       - Added some XS support to learn_set() method.

@@ -84,8 +84,6 @@ __[C]__
     AV* layers ;
     HV* self_hv = OBJ_HV( self );
     char* function ;
-    
-    int counter = 0 ;
         
     AV* nodes = FETCH_ATTR_AV_REF( FETCH_ELEM_HV_REF( FETCH_ATTR_AV_REF(self_hv , "layers") , 0) , "nodes") ;
     for (i = 0 ; i <= av_len(nodes) ; ++i) {
@@ -93,7 +91,7 @@ __[C]__
       
       if ( SvTRUE( FETCH_ATTR(node , "active") ) ) {
         SV* activation = FETCH_ATTR(node , "activation") ;
-        SV* input = *av_fetch(inputPattern, counter ,0) ;
+        SV* input = *av_fetch(inputPattern, i ,0) ;
         
         if ( SvTRUE( FETCH_ATTR(node , "persistent_activation") ) ) {
           sv_setnv(activation , (SvNV(activation) + SvNV(input)) ) ;
@@ -102,8 +100,6 @@ __[C]__
           sv_setnv(activation , SvNV(input)) ;
         }
       }
-      
-      ++counter ;
     }
     
     layers = FETCH_ATTR_AV_REF(self_hv , "layers") ;
