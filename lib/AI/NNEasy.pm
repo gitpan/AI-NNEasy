@@ -1,8 +1,8 @@
 #############################################################################
-## This file was generated automatically by Class::HPLOO/0.20
+## This file was generated automatically by Class::HPLOO/0.21
 ##
 ## Original file:    ./lib/AI/NNEasy.hploo
-## Generation date:  2005-01-15 21:52:35
+## Generation date:  2005-01-16 22:07:24
 ##
 ## ** Do not change this file, use the original HPLOO source! **
 #############################################################################
@@ -29,7 +29,7 @@ use strict qw(vars) ; no warnings ;
 use vars qw(%CLASS_HPLOO @ISA $VERSION) ;
 
   
-$VERSION = '0.05' ;
+$VERSION = '0.06' ;
 
   
 @ISA = qw(Class::HPLOO::Base UNIVERSAL) ;
@@ -110,6 +110,7 @@ use Class::HPLOO::Base ;
         $last = $out_types_i ;
       }
       $error_ok = $min_dif / 2 ;
+      $error_ok -= $error_ok*0.1 ;
     }
     
     $this->{ERROR_OK} = $error_ok ;
@@ -241,9 +242,16 @@ use Class::HPLOO::Base ;
     my $ins_sz = @set / 2 ;
 
     $ins_ok ||= $ins_sz ;
-    $limit ||= 30000 ;
     
     my $err_static_limit = 15 ;
+    my $err_static_limit_positive ;
+
+    if ( ref($limit) eq 'ARRAY' ) {
+      ($limit,$err_static_limit,$err_static_limit_positive) = @$limit ;
+    }
+    
+    $limit ||= 30000 ;
+    $err_static_limit_positive ||= $err_static_limit/2 ;
   
     my $error_ok = $this->{ERROR_OK} ;
     
@@ -264,14 +272,14 @@ use Class::HPLOO::Base ;
         
         $err_count += $err_diff ;
         
-        ++$err_static if $err_diff <= 0.00001 ;
+        ++$err_static if $err_diff <= 0.00001 || $err > 1 ;
         
         print "err_static = $err_static\n" if $verbose && $err_static ;
 
         $err_last = $err ;
         
         my $reseted ;
-        if ( $err_static >= $err_static_limit ) {
+        if ( $err_static >= $err_static_limit || ($err > 1 && $err_static >= $err_static_limit_positive) ) {
           $err_static = 0 ;
           $counter -= 2000 ;
           $reseted = 1 ;
@@ -389,7 +397,9 @@ use Class::HPLOO::Base ;
   }
 
 
-use Inline C => <<'__INLINE_C_SRC__';
+my $INLINE_INSTALL ; BEGIN { use Config ; my @installs = ($Config{installarchlib} , $Config{installprivlib} , $Config{installsitelib}) ; foreach my $i ( @installs ) { $i =~ s/[\\\/]/\//gs ;} $INLINE_INSTALL = 1 if ( __FILE__ =~ /\.pm$/ && ( join(" ",@INC) =~ /\Wblib\W/s || __FILE__ =~ /^(?:\Q$installs[0]\E|\Q$installs[1]\E|\Q$installs[2]\E)/ ) ) ; }
+
+use Inline C => <<'__INLINE_C_SRC__' , ( $INLINE_INSTALL ? (NAME => 'AI::NNEasy' , VERSION => '0.06') : () ) ;
 
 
 #define OBJ_SV(self)		SvRV( self )
@@ -411,7 +421,7 @@ use Inline C => <<'__INLINE_C_SRC__';
 #define FETCH_ELEM_AV_REF(av,i)	(AV*) SvRV( FETCH_ELEM(av,i) )
 
 SV* _av_join( AV* av ) {
-    SV* ret = newSVpv("",0) ;
+    SV* ret = sv_2mortal(newSVpv("",0)) ;
     int i ;
     for (i = 0 ; i <= av_len(av) ; ++i) {
       SV* elem = *av_fetch(av, i ,0) ;
@@ -429,7 +439,7 @@ void _learn_set_get_output_error_c( SV* self , SV* set , double error_ok , int i
     HV* self_hv = OBJ_HV( self );
     AV* set_av = OBJ_AV( set ) ;
     SV* nn = FETCH_ATTR(self_hv , "NN") ;
-    SV* print_verbose = verbose ? newSVpv("",0) : NULL ;
+    SV* print_verbose = verbose ? sv_2mortal(newSVpv("",0)) : NULL ;
     SV* ret ;
     double err = 0 ;
     double er = 0 ;
@@ -485,11 +495,19 @@ void _learn_set_get_output_error_c( SV* self , SV* set , double error_ok , int i
     
     err /= ins_ok ;
 
-    EXTEND(SP , 3) ;
-      ST(0) = sv_2mortal(newSVnv(err)) ;
-      ST(1) = sv_2mortal(newSViv(learn_ok)) ;
-      if (verbose) ST(2) = sv_2mortal(print_verbose) ;
-    XSRETURN(3) ;
+    if (verbose) {
+      EXTEND(SP , 3) ;
+        ST(0) = sv_2mortal(newSVnv(err)) ;
+        ST(1) = sv_2mortal(newSViv(learn_ok)) ;
+        ST(2) = print_verbose ;
+      XSRETURN(3) ;
+    }
+    else {
+      EXTEND(SP , 2) ;
+        ST(0) = sv_2mortal(newSVnv(err)) ;
+        ST(1) = sv_2mortal(newSViv(learn_ok)) ;
+      XSRETURN(2) ;
+    }
 }
 
 __INLINE_C_SRC__
@@ -627,7 +645,33 @@ Conf can be used to define special parameters of the NN:
 
 Default:
 
- {random_connections=>0 , networktype=>'feedforward' , random_weights=>1 , learning_algorithm=>'backprop' , learning_rate=>0.1 , bias=>1}
+ {networktype=>'feedforward' , random_weights=>1 , learning_algorithm=>'backprop' , learning_rate=>0.1 , bias=>1}
+ 
+Options:
+
+=over 4
+
+=item networktype
+
+The type of the NN. For now only accepts I<'feedforward'>.
+
+=item random_weights
+
+Maximum value for initial weight.
+
+=item learning_algorithm
+
+Algorithm to train the NN. Accepts I<'backprop'> and I<'reinforce'>.
+
+=item learning_rate
+
+Rate used in the learning_algorithm.
+
+=item bias
+
+If true will create a BIAS node. Usefull when you have NULL inputs, like [0,0].
+
+=back
 
 =back
 
@@ -727,6 +771,11 @@ we get the output of I<run()>, let's say that is 0.98324, and find what output
 is near of this number, that in this case should be 1. An output [0], will return
 by I<run()> something like 0.078964, and I<run_get_winner()> return 0.
 
+=head1 Samples
+
+Inside the release sources you can find the directory ./samples where you have some
+examples of code using this module.
+
 =head1 INLINE C
 
 Some functions of this module have I<Inline> functions writed in C.
@@ -743,7 +792,7 @@ I have made a C version only for the functions that are wild called, like:
   AI::NNEasy::NN::backprop::hiddenOrInputToHidden
   AI::NNEasy::NN::backprop::RMSErr
 
-What give use the speed that we need to learn fast the inputs, but at the same time
+What give to us the speed that we need to learn fast the inputs, but at the same time
 be able to create flexible NN.
 
 =head1 Class::HPLOO
@@ -833,13 +882,17 @@ since the learning fase will be faster and works better for complex problems.
 
 =head1 SEE ALSO
 
-L<AI::NNFlex>, L<AI::Neural::Simple>, L<Class::HPLOO>, L<Inline>.
+L<AI::NNFlex>, L<AI::NeuralNet::Simple>, L<Class::HPLOO>, L<Inline>.
 
 =head1 AUTHOR
 
 Graciliano M. P. <gmpassos@cpan.org>
 
 I will appreciate any type of feedback (include your opinions and/or suggestions). ;-P
+
+Thanks a lot to I<Charles Colbourn <charlesc at nnflex.g0n.net>>, that is the
+author of L<AI::NNFlex>, that 1st wrote it, since NNFlex was my starting point to
+do this NN work, and 2nd to be in touch with the development of L<AI::NNEasy>.
 
 =head1 COPYRIGHT
 

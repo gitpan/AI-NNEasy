@@ -12,7 +12,7 @@
 
 use Class::HPLOO qw(base alloo) ;
 
-class AI::NNEasy::NN::feedforward extends AI::NNEasy::NN {
+class AI::NNEasy::NN::feedforward[0.06] extends AI::NNEasy::NN {
 
 __[C]__
 #define OBJ_HV(self)		(HV*) SvRV( self )

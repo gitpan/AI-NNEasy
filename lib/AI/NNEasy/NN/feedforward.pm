@@ -1,8 +1,8 @@
 #############################################################################
-## This file was generated automatically by Class::HPLOO/0.20
+## This file was generated automatically by Class::HPLOO/0.21
 ##
 ## Original file:    ./lib/AI/NNEasy/NN/feedforward.hploo
-## Generation date:  2005-01-15 21:42:33
+## Generation date:  2005-01-16 19:52:04
 ##
 ## ** Do not change this file, use the original HPLOO source! **
 #############################################################################
@@ -26,7 +26,10 @@
 use strict qw(vars) ; no warnings ;
 
 
-use vars qw(%CLASS_HPLOO @ISA) ;
+use vars qw(%CLASS_HPLOO @ISA $VERSION) ;
+
+
+$VERSION = '0.06' ;
 
 
 push(@ISA , qw(AI::NNEasy::NN Class::HPLOO::Base UNIVERSAL)) ;
@@ -90,7 +93,9 @@ use Class::HPLOO::Base ;
   
   
 
-use Inline C => <<'__INLINE_C_SRC__';
+my $INLINE_INSTALL ; BEGIN { use Config ; my @installs = ($Config{installarchlib} , $Config{installprivlib} , $Config{installsitelib}) ; foreach my $i ( @installs ) { $i =~ s/[\\\/]/\//gs ;} $INLINE_INSTALL = 1 if ( __FILE__ =~ /\.pm$/ && ( join(" ",@INC) =~ /\Wblib\W/s || __FILE__ =~ /^(?:\Q$installs[0]\E|\Q$installs[1]\E|\Q$installs[2]\E)/ ) ) ; }
+
+use Inline C => <<'__INLINE_C_SRC__' , ( $INLINE_INSTALL ? (NAME => 'AI::NNEasy::NN::feedforward' , VERSION => '0.06') : () ) ;
 
 
 #define OBJ_HV(self)		(HV*) SvRV( self )

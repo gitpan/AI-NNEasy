@@ -1,5 +1,10 @@
 Revision history for Perl extension AI::NNEasy.
 
+0.06  2005-01-16
+      - Added reinforce learning algorithm.
+      - Added check of errors bigger than 1 at learn_set().
+      - Fix some memory leak for non mortal SV*.
+
 0.05  2005-01-15
       - Fixed default values for layers, specially the activation
         funtion for the output layer that is better as linear.

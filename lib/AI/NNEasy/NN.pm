@@ -1,8 +1,8 @@
 #############################################################################
-## This file was generated automatically by Class::HPLOO/0.20
+## This file was generated automatically by Class::HPLOO/0.21
 ##
 ## Original file:    ./lib/AI/NNEasy/NN.hploo
-## Generation date:  2005-01-15 20:22:46
+## Generation date:  2005-01-16 19:51:58
 ##
 ## ** Do not change this file, use the original HPLOO source! **
 #############################################################################
@@ -17,6 +17,10 @@
 ## Copyright:   (c) 2005 Graciliano M. P. 
 ## Licence:     This program is free software; you can redistribute it and/or
 ##              modify it under the same terms as Perl itself
+##
+## This class and classes inside AI::NNEasy::NN::* were 1st based in the
+## module AI::NNFlex from Charles Colbourn <charlesc at nnflex.g0n.net>.
+##
 #############################################################################
 
 
@@ -26,7 +30,7 @@
 
   use vars qw(%CLASS_HPLOO @ISA $VERSION) ;
 
-  $VERSION = '0.01' ;
+  $VERSION = '0.06' ;
 
   @ISA = qw(Class::HPLOO::Base UNIVERSAL) ;
 
@@ -166,7 +170,17 @@
     }
   }
   
-  sub sigmoid { my $this = ref($_[0]) ? shift : undef ;my $CLASS = ref($this) || __PACKAGE__ ;my $value = shift(@_) ; return (1+exp(-$value))**-1 ;}
+  *sigmoid = \&sigmoid_c ;
+  
+  sub sigmoid_pl { 
+    my $this = ref($_[0]) ? shift : undef ;
+    my $CLASS = ref($this) || __PACKAGE__ ;
+    my $value = shift(@_) ;
+    
+    return (1+exp(-$value))**-1 ;
+  }
+  
+  
   
   sub AUTOLOAD { 
     my $this = ref($_[0]) ? shift : undef ;
@@ -179,7 +193,9 @@
     die("Can't find $AUTOLOAD or $sub at @call\n") ;
   }
 
-use Inline C => <<'__INLINE_C_SRC__';
+my $INLINE_INSTALL ; BEGIN { use Config ; my @installs = ($Config{installarchlib} , $Config{installprivlib} , $Config{installsitelib}) ; foreach my $i ( @installs ) { $i =~ s/[\\\/]/\//gs ;} $INLINE_INSTALL = 1 if ( __FILE__ =~ /\.pm$/ && ( join(" ",@INC) =~ /\Wblib\W/s || __FILE__ =~ /^(?:\Q$installs[0]\E|\Q$installs[1]\E|\Q$installs[2]\E)/ ) ) ; }
+
+use Inline C => <<'__INLINE_C_SRC__' , ( $INLINE_INSTALL ? (NAME => 'AI::NNEasy::NN' , VERSION => '0.06') : () ) ;
 
 double tanh_c ( SV* self , double value ) {
     if      ( value > 20 ) { return 1 ;}
@@ -190,6 +206,12 @@ double tanh_c ( SV* self , double value ) {
       double ret = (x-y)/(x+y) ;
       return ret ;
     }
+}
+
+double sigmoid_c ( SV* self , double value ) {
+    double ret = 1 + Perl_exp( -value ) ;
+    ret = Perl_pow(ret , -1) ;
+    return ret ;
 }
 
 __INLINE_C_SRC__

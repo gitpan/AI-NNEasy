@@ -12,7 +12,7 @@
 
 use Class::HPLOO qw(base alloo) ;
 
-class AI::NNEasy::NN::backprop {
+class AI::NNEasy::NN::backprop[0.06] {
 
 __[C]__
 #define OBJ_HV(self)		(HV*) SvRV( self )
