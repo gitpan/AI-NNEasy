@@ -1,5 +1,8 @@
 Revision history for Perl extension AI::NNEasy.
 
+0.02  2005-01-14 00:11:38
+      - Fix make file prereq.
+
 0.01  2005-01-14 00:11:38
       - original version;
 

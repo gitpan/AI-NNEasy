@@ -33,8 +33,9 @@ use warnings qw'all' ;
   
   my $set_err = $nn->get_set_error(\@set) ;
   
-  if ( $set_err > $ERR_OK ) {
+  while ( $set_err > $ERR_OK ) {
     $nn->learn_set( \@set , 4 , 30000 , 0 ) ;
+    $set_err = $nn->get_set_error(\@set) ;
   }
   
   for (my $i = 0 ; $i < @set ; $i+=2) {

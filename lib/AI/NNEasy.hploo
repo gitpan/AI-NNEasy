@@ -12,7 +12,7 @@
 
 use Class::HPLOO qw(base alloo) ;
 
-class AI::NNEasy[0.01] {
+class AI::NNEasy[0.02] {
 
   use AI::NNEasy::NN ;
   use Storable qw(freeze thaw) ;
