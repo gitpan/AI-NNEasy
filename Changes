@@ -1,5 +1,8 @@
 Revision history for Perl extension AI::NNEasy.
 
+0.03  2005-01-14 00:11:38
+      - Changed requisite of Class::HPLOO to version 0.19.
+
 0.02  2005-01-14 00:11:38
       - Fix make file prereq.
 

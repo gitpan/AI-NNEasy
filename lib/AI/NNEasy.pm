@@ -1,8 +1,8 @@
 #############################################################################
-## This file was generated automatically by Class::HPLOO/0.18
+## This file was generated automatically by Class::HPLOO/0.19
 ##
 ## Original file:    ./lib/AI/NNEasy.hploo
-## Generation date:  2005-01-14 02:07:49
+## Generation date:  2005-01-14 18:37:25
 ##
 ## ** Do not change this file, use the original HPLOO source! **
 #############################################################################
@@ -26,7 +26,7 @@
 
   use vars qw(%CLASS_HPLOO @ISA $VERSION) ;
 
-  $VERSION = '0.02' ;
+  $VERSION = '0.03' ;
 
   @ISA = qw(Class::HPLOO::Base UNIVERSAL) ;
 

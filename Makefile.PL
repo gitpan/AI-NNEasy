@@ -8,7 +8,7 @@ WriteMakefile(
     'NAME'          => 'AI::NNEasy' ,
     'VERSION_FROM'  => 'lib/AI/NNEasy.pm' ,
     'PREREQ_PM'     => {
-      'Class::HPLOO'  => 0.18 ,
+      'Class::HPLOO'  => 0.19 ,
       'Inline'        => 0.44 ,
     } ,
     ($] >= 5.005 ?
