@@ -1,8 +1,8 @@
 #############################################################################
-## This file was generated automatically by Class::HPLOO/0.19
+## This file was generated automatically by Class::HPLOO/0.20
 ##
 ## Original file:    ./lib/AI/NNEasy/NN.hploo
-## Generation date:  2005-01-14 18:37:06
+## Generation date:  2005-01-15 20:22:46
 ##
 ## ** Do not change this file, use the original HPLOO source! **
 #############################################################################

@@ -12,11 +12,31 @@
 
 use Class::HPLOO qw(base alloo) ;
 
-class AI::NNEasy[0.03] {
+class AI::NNEasy[0.04] {
 
   use AI::NNEasy::NN ;
   use Storable qw(freeze thaw) ;
   use Data::Dumper ;
+  
+__[C]__
+#define OBJ_SV(self)		SvRV( self )
+#define OBJ_HV(self)		(HV*) SvRV( self )
+#define OBJ_AV(self)		(AV*) SvRV( self )
+
+#define FETCH_ATTR(hv,k)	*hv_fetch(hv, k , strlen(k) , 0)
+#define FETCH_ATTR_PV(hv,k)	SvPV( FETCH_ATTR(hv,k) , len)
+#define FETCH_ATTR_NV(hv,k)	SvNV( FETCH_ATTR(hv,k) )
+#define FETCH_ATTR_IV(hv,k)	SvIV( FETCH_ATTR(hv,k) )  
+#define FETCH_ATTR_HV(hv,k)	(HV*) FETCH_ATTR(hv,k)
+#define FETCH_ATTR_AV(hv,k)	(AV*) FETCH_ATTR(hv,k)
+#define FETCH_ATTR_SV_REF(hv,k)	SvRV( FETCH_ATTR(hv,k) )
+#define FETCH_ATTR_HV_REF(hv,k)	(HV*) SvRV( FETCH_ATTR(hv,k) )
+#define FETCH_ATTR_AV_REF(hv,k)	(AV*) SvRV( FETCH_ATTR(hv,k) )
+
+#define FETCH_ELEM(av,i)		*av_fetch(av,i,0)
+#define FETCH_ELEM_HV_REF(av,i)	(HV*) SvRV( FETCH_ELEM(av,i) )
+#define FETCH_ELEM_AV_REF(av,i)	(AV*) SvRV( FETCH_ELEM(av,i) )
+__[C]__
 
   sub NNEasy ($file , \@out_types , $error_ok , $in , $out , \@layers , $conf) {
     $file ||= 'nneasy.nne' ;
@@ -53,9 +73,25 @@ class AI::NNEasy[0.03] {
     
     @out_types = (0,1) if !@out_types ;
     
-    $this->{OUT_TYPES} = [ sort {$a <=> $b} @out_types ] ;
+    @out_types = sort {$a <=> $b} @out_types ;
     
-    $this->{ERROR_OK} = $error_ok || 0.1 ;
+    $this->{OUT_TYPES} = \@out_types ;
+    
+    if ( $error_ok <= 0 ) {
+      my ($min_dif , $last) ;
+      my $i = -1 ;
+      foreach my $out_types_i ( @out_types ) {
+        ++$i ;
+        if ($i > 0) {
+          my $dif = $out_types_i - $last ;
+          $min_dif = $dif if !defined $min_dif || $dif < $min_dif ;
+        }
+        $last = $out_types_i ;
+      }
+      $error_ok = $min_dif / 2 ;
+    }
+    
+    $this->{ERROR_OK} = $error_ok ;
     
     return $this ;
   }
@@ -105,35 +141,129 @@ class AI::NNEasy[0.03] {
     return $err ;
   }
   
+  *_learn_set_get_output_error = \&_learn_set_get_output_error_c ;
+  
+  sub _learn_set_get_output_error_pl ($set , $error_ok , $ins_ok , $verbose) {
+    for (my $i = 0 ; $i < @$set ; $i+=2) {
+      $this->{NN}->run($$set[$i]) ;
+      $this->{NN}->learn($$set[$i+1]) ;
+    }
+
+    my ($err,$learn_ok,$print) ;
+    for (my $i = 0 ; $i < @$set ; $i+=2) {
+      $this->{NN}->run($$set[$i]) ;
+      my $er = $this->{NN}->RMSErr($$set[$i+1]) ;
+      $er *= -1 if $er < 0 ;
+      ++$learn_ok if $er < $error_ok ;
+      $err += $er ;
+      $print .= join(' ',@{$$set[$i]}) ." => ". join(' ',@{$$set[$i+1]}) ." > $er\n" if $verbose ;
+    }
+    
+    $err /= $ins_ok ;
+    
+    return ( $err , $learn_ok , $print ) ;
+  }
+  
+  sub[C] SV* _av_join( AV* av ) {
+    SV* ret = newSVpv("",0) ;
+    int i ;
+    for (i = 0 ; i <= av_len(av) ; ++i) {
+      SV* elem = *av_fetch(av, i ,0) ;
+      if (i > 0) sv_catpv(ret , " ") ;
+      sv_catsv(ret , elem) ;
+    }
+    return ret ;
+  }
+  
+  sub[C] void _learn_set_get_output_error_c( SV* self , SV* set , double error_ok , int ins_ok , bool verbose ) {
+    dXSARGS;
+    
+    STRLEN len;
+    int i , j , k ;
+    HV* self_hv = OBJ_HV( self );
+    AV* set_av = OBJ_AV( set ) ;
+    SV* nn = FETCH_ATTR(self_hv , "NN") ;
+    SV* print_verbose = verbose ? newSVpv("",0) : NULL ;
+    SV* ret ;
+    double err = 0 ;
+    double er = 0 ;
+    int learn_ok = 0 ;
+        
+    for (i = 0 ; i <= av_len(set_av) ; i+=2) {
+      SV* set_in = *av_fetch(set_av, i ,0) ;
+      SV* set_out = *av_fetch(set_av, i+1 ,0) ;
+
+      PUSHMARK(SP) ;
+        XPUSHs( nn );
+        XPUSHs( set_in );
+      PUTBACK ;
+      call_method("run", G_DISCARD) ;
+      
+      PUSHMARK(SP) ;
+        XPUSHs( nn );
+        XPUSHs( set_out );
+      PUTBACK ;
+      call_method("learn", G_SCALAR) ;
+    }
+    
+    for (i = 0 ; i <= av_len(set_av) ; i+=2) {
+      SV* set_in = *av_fetch(set_av, i ,0) ;
+      SV* set_out = *av_fetch(set_av, i+1 ,0) ;
+
+      PUSHMARK(SP) ;
+        XPUSHs( nn );
+        XPUSHs( set_in );
+      PUTBACK ;
+      call_method("run", G_DISCARD) ;
+      
+      PUSHMARK(SP) ;
+        XPUSHs( nn );
+        XPUSHs( set_out );
+      PUTBACK ;
+      call_method("RMSErr", G_SCALAR) ;
+      
+      SPAGAIN ;
+      ret = POPs ;
+      er = SvNV(ret) ;
+      if (er < 0) er *= -1 ;
+      if (er < error_ok) ++learn_ok ;
+      err += er ;
+      
+      if ( verbose ) sv_catpvf(print_verbose , "%s => %s > %f\n" ,
+                       SvPV( _av_join( OBJ_AV(set_in) ) , len) ,
+                       SvPV( _av_join( OBJ_AV(set_out) ) , len) ,
+                       er
+                     ) ;
+
+    }
+    
+    err /= ins_ok ;
+
+    EXTEND(SP , 3) ;
+      ST(0) = sv_2mortal(newSVnv(err)) ;
+      ST(1) = sv_2mortal(newSViv(learn_ok)) ;
+      if (verbose) ST(2) = sv_2mortal(print_verbose) ;
+    XSRETURN(3) ;
+  }
+    
   sub learn_set (\@set,$ins_ok,$limit,$verbose) {
     my $ins_sz = @set / 2 ;
 
     $ins_ok ||= $ins_sz ;
     $limit ||= 30000 ;
+    
+    my $err_static_limit = 30 ;
   
     my $error_ok = $this->{ERROR_OK} ;
+    
+    my $check_diff_count = 1000 ;
     
     my ($learn_ok,$counter,$err,$err_last,$err_count,$err_static, $reset_count1 , $reset_count2 ,$print) ;
     
     $err_static = 0 ;
     
     while ( ($learn_ok < $ins_ok) && ($counter < $limit) ) {
-      $learn_ok = 0 ;
-      $err = 0 ;
-      
-      $print = '' if $verbose ;
-      for (my $i = 0 ; $i < @set ; $i+=2) {       
-        $this->{NN}->run($set[$i]) ;
-        my $er = $this->{NN}->learn($set[$i+1]) ;
-        $er *= -1 if $er < 0 ;
-        
-        ++$learn_ok if $er < $error_ok ;
-        $err += $er ;
-        
-        $print .= join(' ',@{$set[$i]}) ." => ". join(' ',@{$set[$i+1]}) ." > $er\n" ;
-      }
-      
-      $err /= $ins_ok ;
+      ($err , $learn_ok , $print) = $this->_learn_set_get_output_error(\@set , $error_ok , $ins_ok , $verbose) ;
       
       ++$counter ;
       
@@ -149,11 +279,11 @@ class AI::NNEasy[0.03] {
 
         $err_last = $err ;
         
-        my $inited ;
-        if ( $err_static >= 15 ) {
+        my $reseted ;
+        if ( $err_static >= $err_static_limit ) {
           $err_static = 0 ;
           $counter -= 2000 ;
-          $inited = 1 ;
+          $reseted = 1 ;
           ++$reset_count1 ;
           
           if ( ( $reset_count1 + $reset_count2 ) > 2 ) {
@@ -167,12 +297,12 @@ class AI::NNEasy[0.03] {
           }
         }
         
-        if ( !($counter % 1000) ) {
-          $err_count /= 10 ;
+        if ( !($counter % $check_diff_count) ) {
+          $err_count /= ($check_diff_count/100) ;
           
           print "ERR COUNT> $err_count\n" if $verbose ;
           
-          if ( !$inited && $err_count < 0.001 ) {
+          if ( !$reseted && $err_count < 0.001 ) {
             $err_static = 0 ;
             $counter -= 1000 ;
             ++$reset_count2 ;
@@ -192,7 +322,7 @@ class AI::NNEasy[0.03] {
         }
         
         if ( $verbose ) {
-          print "\nepoch $counter : error = $err : err_diff = $err_diff : err_static = $err_static : ok = $learn_ok\n" ;
+          print "\nepoch $counter : error_ok = $error_ok : error = $err : err_diff = $err_diff : err_static = $err_static : ok = $learn_ok\n" ;
           print $print ;
         }
       }
@@ -242,19 +372,11 @@ class AI::NNEasy[0.03] {
     foreach my $types_i ( @{ $this->{OUT_TYPES} } ) {
       my $er = $types_i - $val ;
       $er *= -1 if $er < 0 ;
-      
-      if ( $er < $this->{ERROR_OK} ) {
-        $out_type = $types_i ;
-        last ;
-      }
-      
       $err{$types_i} = $er ;
     }
     
-    if ( !defined $out_type ) {
-      my $min_type_err = (sort { $err{$a} <=> $err{$b} } keys %err)[0] ;
-      $out_type = $min_type_err ;
-    }
+    my $min_type_err = (sort { $err{$a} <=> $err{$b} } keys %err)[0] ;
+    $out_type = $min_type_err ;
 
     return $out_type ;
   }
@@ -275,7 +397,7 @@ AI::NNEasy - Define, learn and use easy Neural Networks of different types using
 The main purpose of this module is to create easy Neural Networks with Perl.
 
 The module was designed to can be extended to multiple network types, learning algorithms and activation functions.
-This architecture as 1st based in the module L<AI::NNFlex>, than I have rewrited it to fix some
+This architecture was 1st based in the module L<AI::NNFlex>, than I have rewrited it to fix some
 serialization bugs, and have otimized the code and added some XS functions to get speed
 in the learning process. Finally I have added an intuitive inteface to create and use the NN,
 and added a winner algorithm to the output.
@@ -358,6 +480,13 @@ list to give your the right output.
 
 *> ERROR_OK
 The maximal error of the calculated output.
+
+If not defined ERROR_OK will be calculated by the minimal difference between 2 types at
+@OUTPUT_TYPES dived by 2:
+
+  @OUTPUT_TYPES = [0 , 0.5 , 1] ;
+  
+  ERROR_OK = (1 - 0.5) / 2 = 0.25 ;
 
 *> IN_SIZE
 The input size (number of nodes in the inpute layer).
@@ -461,6 +590,8 @@ Some functions of this module have I<Inline> functions writed in C.
 
 I have made a C version only for the functions that are wild called, like:
 
+  AI::NNEasy::_learn_set_get_output_error
+
   AI::NNEasy::NN::tanh
 
   AI::NNEasy::NN::feedforward::run
@@ -513,15 +644,15 @@ For example, here we have a NN with 2 inputs, 1 hidden layer, and 2 outputs:
 Basically, when we have an input, let's say [0,1], it will active I<n2>, that will
 active I<n3> and I<n3> will active I<n4> and I<n5>, but the link between I<n3> and I<n4> has a I<weight>, and
 between I<n3> and I<n5> another I<weight>. The idea is to find the I<weights> between the
-nodes that can give to use an output near the real output. So, if the output of [0,1]
-is [1,1], the nodes I<output1> and I<output2> should give to use a number near 1,
-let's say 0.98654. And if the output for [0,0] is [0], I<output1> and I<output2> should give to use a number near 0,
+nodes that can give to us an output near the real output. So, if the output of [0,1]
+is [1,1], the nodes I<output1> and I<output2> should give to us a number near 1,
+let's say 0.98654. And if the output for [0,0] is [0,0], I<output1> and I<output2> should give to us a number near 0,
 let's say 0.078875.
 
 What is hard in a NN is to find this I<weights>. By default L<AI::NNEasy> uses
 I<backprop> as learning algorithm. With I<backprop> it pastes the inputs through
-the Neural Network and ajust the I<weights> using random numbers until we find
-a set of I<weights> that give to use the right output.
+the Neural Network and adjust the I<weights> using random numbers until we find
+a set of I<weights> that give to us the right output.
 
 The secret of a NN is the number of hidden layers and nodes/neurons for each layer.
 Basically the best way to define the hidden layers is 1 layer of (INPUT_NODES+OUTPUT_NODES).
@@ -542,7 +673,7 @@ right output for your problem.
 
 Other inportant step of a NN is the learning fase. Where we get a set of inputs
 and paste them through the NN until we have the right output. This process basically
-will adjust the nodes I<weights> until we have a output near the real output that we want.
+will adjust the nodes I<weights> until we have an output near the real output that we want.
 
 Other important concept is that the inputs and outputs in the NN should be from 0 to 1.
 So, you can define sets like:
@@ -553,8 +684,8 @@ So, you can define sets like:
   1 0.5    => 0
   1 1      => 1
 
-But what is really recomended is to always use bollean values for inputs and outputs,
-since the learning fase will be faster.
+But what is really recomended is to always use bollean values, just 0 or 1, for inputs and outputs,
+since the learning fase will be faster and works better for complex problems.
 
 => SEE ALSO
 
